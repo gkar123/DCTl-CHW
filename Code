@@ -1,0 +1,98 @@
+% MATLAB Code for Deep Convolutional Transfer Learning-based Crossover Harbor Whisker Seal (DCTL-CHW) Algorithm
+
+% Load Dataset (DIARETDB1)
+function [trainImages, trainLabels, testImages, testLabels] = load_dataset()
+    datasetPath = 'DIARETDB1/'; % Path to dataset
+    categories = {'Healthy', 'DME', 'Glaucoma', 'Cataract'};
+    imageSize = [224 224];
+    
+    imds = imageDatastore(datasetPath, 'IncludeSubfolders', true, 'LabelSource', 'foldernames');
+    imds.ReadFcn = @(filename) preprocess_image(imread(filename));
+    
+    % Split dataset into training and testing
+    [trainImages, testImages] = splitEachLabel(imds, 0.8, 'randomized');
+    trainLabels = trainImages.Labels;
+    testLabels = testImages.Labels;
+end
+
+% Image Preprocessing Function
+function img = preprocess_image(img)
+    img = imresize(img, [224 224]); % Resizing
+    img = rgb2gray(img); % Convert to Grayscale
+    img = histeq(img); % Contrast Enhancement
+    img = flip(img, 2); % Horizontal Flipping
+    img = double(img) / 255.0; % Normalization
+end
+
+% Data Augmentation Function
+function aug_img = augment_image(img)
+    aug_img = img;
+    if rand > 0.5
+        aug_img = imrotate(img, randi([-20,20]));
+    end
+    if rand > 0.5
+        aug_img = flip(img, 2);
+    end
+end
+
+% Feature Extraction using Autoencoder
+function features = extract_features(images, encoder)
+    features = predict(encoder, images);
+end
+
+% Transfer Learning Model
+net = googlenet;
+inputSize = net.Layers(1).InputSize;
+layers = [
+    imageInputLayer(inputSize, 'Normalization', 'none')
+    net.Layers(2:end-3)
+    fullyConnectedLayer(128)
+    dropoutLayer(0.5)
+    fullyConnectedLayer(4)
+    softmaxLayer
+    classificationLayer];
+
+options = trainingOptions('adam', ...
+    'MaxEpochs', 20, ...
+    'MiniBatchSize', 32, ...
+    'InitialLearnRate', 1e-4, ...
+    'ValidationData', validationData, ...
+    'Plots', 'training-progress');
+
+% Train the Model
+[trainImages, trainLabels, testImages, testLabels] = load_dataset();
+trainedNet = trainNetwork(trainImages, trainLabels, layers, options);
+
+% Harbor Whisker Seal Optimization Algorithm
+function best_solution = harbor_whisker_seal_optimization(population, max_iter)
+    best_solution = [];
+    best_score = -inf;
+    for i = 1:max_iter
+        for j = 1:length(population)
+            sensing_velocity = rand * (1.0 - 0.1) + 0.1;
+            attack_angle = rand * pi;
+            candidate_solution = population{j} + sensing_velocity * cos(attack_angle);
+            candidate_score = sum(candidate_solution(:));
+            if candidate_score > best_score
+                best_solution = candidate_solution;
+                best_score = candidate_score;
+            end
+        end
+    end
+end
+
+% Evaluation Metrics
+function evaluate_model(model, testImages, testLabels)
+    predictedLabels = classify(model, testImages);
+    accuracy = sum(predictedLabels == testLabels) / numel(testLabels);
+    fprintf('Accuracy: %.4f\n', accuracy);
+    precision = precision_score(testLabels, predictedLabels);
+    recall = recall_score(testLabels, predictedLabels);
+    f1 = 2 * (precision * recall) / (precision + recall);
+    fprintf('Precision: %.4f\n', precision);
+    fprintf('Recall: %.4f\n', recall);
+    fprintf('F1 Score: %.4f\n', f1);
+end
+
+% Training and Evaluation
+evaluate_model(trainedNet, testImages, testLabels);
